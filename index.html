@@ -3,45 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>班級榮譽積分榜</title>
+    <title>班級榮譽榜管理</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { background-color: #f1f5f9; font-family: sans-serif; padding-bottom: 80px; }
-        .app-header { background: #1e293b; color: white; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        body { background-color: #f1f5f9; font-family: sans-serif; }
+        .app-header { background: #1e293b; color: white; padding: 20px; margin-bottom: 20px; }
         .grid-container { 
             display: grid; grid-template-columns: repeat(auto-fill, minmax(85px, 1fr)); 
-            gap: 12px; padding: 20px; max-width: 900px; margin: 0 auto;
+            gap: 15px; padding: 0 20px; max-width: 900px; margin: 0 auto;
         }
         .num-card {
             background: white; border-radius: 12px; height: 95px;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             border: 1px solid #e2e8f0; cursor: pointer; transition: 0.2s;
         }
-        .num-card:active { transform: scale(0.9); background: #f8fafc; }
+        .num-card:hover { border-color: #3b82f6; }
         .num-id { font-size: 1.5rem; font-weight: bold; color: #1e293b; }
-        /* 藍色總分顯示區 */
-        .num-score { font-size: 1rem; font-weight: bold; color: #2563eb; }
-        .btn-action { height: 60px; font-weight: bold; border-radius: 10px; margin-bottom: 10px; }
+        .num-score { font-size: 0.9rem; font-weight: bold; color: #2563eb; } /* 藍色分數 */
+        .btn-action { height: 60px; font-weight: bold; border-radius: 12px; }
     </style>
 </head>
 <body>
 
-<div class="app-header text-center">
+<div class="app-header text-center shadow">
     <h4 class="fw-bold mb-0">🏆 班級榮譽積分榜</h4>
-    <p id="status" class="small mb-0 opacity-75">資料讀取中...</p>
+    <p id="status" class="small mb-0 opacity-75">正在讀取最新分數...</p>
 </div>
 
 <div class="grid-container" id="grid"></div>
 
 <div class="modal fade" id="scoreModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content p-4" style="border-radius: 20px;">
-            <h5 id="modalTitle" class="text-center fw-bold mb-3">座號</h5>
-            <div class="row g-2 text-center">
-                <div class="col-6"><button class="btn btn-success w-100 btn-action" onclick="sendScore(1)">+1</button></div>
-                <div class="col-6"><button class="btn btn-primary w-100 btn-action" onclick="sendScore(2)">+2</button></div>
-                <div class="col-6"><button class="btn btn-danger w-100 btn-action" onclick="sendScore(-1)">-1</button></div>
-                <div class="col-6"><button class="btn btn-warning w-100 btn-action text-white" onclick="sendScore(-2)">-2</button></div>
+        <div class="modal-content p-4" style="border-radius: 20px; border: none;">
+            <h5 id="modalTitle" class="text-center fw-bold mb-4">座號</h5>
+            <div class="row g-2">
+                <div class="col-6"><button class="btn btn-success w-100 btn-action" onclick="send(1)">+1 分</button></div>
+                <div class="col-6"><button class="btn btn-primary w-100 btn-action" onclick="send(2)">+2 分</button></div>
+                <div class="col-6"><button class="btn btn-danger w-100 btn-action" onclick="send(-1)">-1 分</button></div>
+                <div class="col-6"><button class="btn btn-warning w-100 btn-action text-white" onclick="send(-2)">-2 分</button></div>
             </div>
         </div>
     </div>
@@ -49,77 +48,57 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    // 你的 CSV 連結與表單連結
-    const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTeo2bjSCe5pPTsYHKFnyUbYv-c4WQ85qMWk0UUGWbqupW7gTVkDAENCtjOEY0voPjHQkchbGWOuOM2/pub?output=csv";
+    // 請替換為您在「第一步」取得的『工作表1』CSV 連結
+    const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTeo2bjSCe5pPTsYHKFnyUbYv-c4WQ85qMWk0UUGWbqupW7gTVkDAENCtjOEY0voPjHQkchbGWOuOM2/pub?gid=你的GID&single=true&output=csv";
     const FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScUCNSdNuqfZe-glPZYv0gHYtMKCHITMFILOLVnRw7pSBVnMQ/formResponse";
 
     let scores = {};
     let selectedId = 0;
     const modal = new bootstrap.Modal(document.getElementById('scoreModal'));
 
-    // 初始化 1-36 號
     for (let n = 1; n <= 36; n++) scores[n] = 0;
 
     async function loadData() {
         try {
-            // 使用 fetch 抓取 CSV
-            const resp = await fetch(CSV_URL + "&cachebust=" + new Date().getTime());
+            const resp = await fetch(CSV_URL + "&t=" + Date.now());
             const text = await resp.text();
-            
-            // 解析每一行
-            const rows = text.split(/\r?\n/);
+            const rows = text.split(/\r?\n/).filter(r => r.trim() !== "");
             
             rows.forEach(row => {
-                const cols = row.split(',');
-                // 嘗試將第一欄解析為座號，第二欄解析為分數
-                const id = parseInt(cols[0]);
-                const score = parseFloat(cols[1]);
-                
-                if (!isNaN(id) && scores[id] !== undefined) {
-                    scores[id] = isNaN(score) ? 0 : score;
-                }
+                const cols = row.split(',').map(c => c.replace(/"/g, '').trim());
+                const id = parseInt(cols[0]); // A欄：座號
+                const pts = parseFloat(cols[1]); // B欄：總分
+                if (!isNaN(id) && scores[id] !== undefined) scores[id] = isNaN(pts) ? 0 : pts;
             });
-            renderGrid();
-            document.getElementById('status').innerText = "最後更新：" + new Date().toLocaleTimeString();
+            render();
+            document.getElementById('status').innerText = "最後同步時間：" + new Date().toLocaleTimeString();
         } catch (e) {
-            document.getElementById('status').innerText = "連線失敗，請稍後再試";
+            document.getElementById('status').innerText = "連線異常，請確認 CSV 是否正確發布";
         }
     }
 
-    function renderGrid() {
+    function render() {
         const grid = document.getElementById('grid');
         grid.innerHTML = '';
         for (let i = 1; i <= 36; i++) {
             const card = document.createElement('div');
-            card.className = 'num-card';
+            card.className = 'num-card shadow-sm';
             card.innerHTML = `<div class="num-id">${i}</div><div class="num-score">${scores[i]} 分</div>`;
-            card.onclick = () => {
-                selectedId = i;
-                document.getElementById('modalTitle').innerText = i + " 號同學";
-                modal.show();
-            };
+            card.onclick = () => { selectedId = i; document.getElementById('modalTitle').innerText = i + ' 號同學'; modal.show(); };
             grid.appendChild(card);
         }
     }
 
-    function sendScore(pts) {
+    function send(pts) {
         modal.hide();
-        // 你的表單 Entry ID
-        const entryId = "entry.1999437402";
-        const entryScore = "entry.616875581";
-        
-        // 建立提交網址
-        const submitUrl = `${FORM_URL}?${entryId}=${selectedId}&${entryScore}=${pts}&submit=Submit`;
+        // 你的表單 entry ID
+        const url = `${FORM_URL}?entry.1999437402=${selectedId}&entry.616875581=${pts}&submit=Submit`;
 
-        // 在背景偷偷發送 (no-cors 模式)
-        fetch(submitUrl, { mode: 'no-cors' })
-            .then(() => {
-                // 為了讓老師有感覺，本地分數先手動更新
-                scores[selectedId] += pts;
-                renderGrid();
-                alert(selectedId + " 號操作成功！資料約在 5 分鐘後同步到總分。");
-            })
-            .catch(() => alert("連線失敗，請檢查網路"));
+        fetch(url, { mode: 'no-cors' }).then(() => {
+            scores[selectedId] += pts; // 本地即時更新顯示
+            render();
+            alert(`已送出：${selectedId} 號 ${pts > 0 ? '+' : ''}${pts} 分`);
+        }).catch(err => alert("傳送失敗，請檢查網路"));
     }
 
     window.onload = loadData;
