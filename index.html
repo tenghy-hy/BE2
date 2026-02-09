@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>班級加扣分系統</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8fafc; padding-bottom: 50px; }
+        .app-header { background: #1e293b; color: white; padding: 20px; margin-bottom: 20px; }
+        .grid-container { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(85px, 1fr)); 
+            gap: 15px; padding: 0 20px; max-width: 900px; margin: 0 auto;
+        }
+        .num-card {
+            background: white; border-radius: 12px; height: 90px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer; border: 1px solid #e2e8f0;
+        }
+        .num-card:active { transform: scale(0.9); background: #f1f5f9; }
+        .num-id { font-size: 1.5rem; font-weight: bold; }
+        .num-score { font-size: 0.8rem; color: #64748b; }
+    </style>
+</head>
+<body>
+
+<div class="app-header text-center">
+    <h3>🚀 班級加扣分</h3>
+    <p id="status" class="small text-warning">正在連接 Google 試算表...</p>
+</div>
+
+<div class="grid-container" id="grid"></div>
+
+<div class="modal fade" id="scoreModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content text-center p-4" style="border-radius: 20px;">
+            <h4 id="modalTitle" class="mb-3">座號</h4>
+            <div class="row g-2">
+                <div class="col-6"><button class="btn btn-success w-100 py-3" onclick="submitToForm(1)">+1</button></div>
+                <div class="col-6"><button class="btn btn-primary w-100 py-3" onclick="submitToForm(2)">+2</button></div>
+                <div class="col-6"><button class="btn btn-danger w-100 py-3" onclick="submitToForm(-1)">-1</button></div>
+                <div class="col-6"><button class="btn btn-warning w-100 py-3 text-white" onclick="submitToForm(-2)">-2</button></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTeo2bjSCe5pPTsYHKFnyUbYv-c4WQ85qMWk0UUGWbqupW7gTVkDAENCtjOEY0voPjHQkchbGWOuOM2/pub?output=csv";
+    const FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScUCNSdNuqfZe-glPZYv0gHYtMKCHITMFILOLVnRw7pSBVnMQ/formResponse";
+
+    let scores = {};
+    let selectedId = 0;
+    const modal = new bootstrap.Modal(document.getElementById('scoreModal'));
+
+    // 初始化 1-36 號 (預防讀取失敗)
+    for (let n = 1; n <= 36; n++) scores[n] = 0;
+
+    window.onload = function() {
+        renderGrid(); // 先畫出方塊
+        loadData();   // 再去抓資料更新分數
+    };
+
+    async function loadData() {
+        try {
+            const response = await fetch(CSV_URL);
+            if (!response.ok) throw new Error("網路請求失敗");
+            const text = await response.text();
+            const rows = text.split('\n').slice(1);
+            
+            rows.forEach(row => {
+                const cols = row.split(',');
+                const id = parseInt(cols[1]); // 座號在第二欄
+                const pts = parseFloat(cols[3]); // 分數在第四欄
+                if (!isNaN(id) && scores[id] !== undefined) {
+                    scores[id] += (isNaN(pts) ? 0 : pts);
+                }
+            });
+            renderGrid();
+            document.getElementById('status').innerText = "連線成功，資料已同步";
+            document.getElementById('status').className = "small text-success";
+        } catch (e) {
+            console.error(e);
+            document.getElementById('status').innerText = "唯讀模式 (無法從 Google 取得最新總分)";
+        }
+    }
+
+    function renderGrid() {
+        const grid = document.getElementById('grid');
+        grid.innerHTML = '';
+        for (let i = 1; i <= 36; i++) {
+            const card = document.createElement('div');
+            card.className = 'num-card';
+            card.innerHTML = `<div class="num-id">${i}</div><div class="num-score">${scores[i]} 分</div>`;
+            card.onclick = () => {
+                selectedId = i;
+                document.getElementById('modalTitle').innerText = i + ' 號同學';
+                modal.show();
+            };
+            grid.appendChild(card);
+        }
+    }
+
+    function submitToForm(pts) {
+        modal.hide();
+        // 核心：透過隱藏的請求傳送給 Google Form
+        const finalUrl = `${FORM_URL}?entry.1999437402=${selectedId}&entry.616875581=${pts}&submit=Submit`;
+        
+        fetch(finalUrl, { mode: 'no-cors' })
+            .then(() => {
+                alert(selectedId + ' 號已傳送分數 ' + pts);
+                // 由於 CSV 更新有延遲，本地先手動更新顯示
+                scores[selectedId] += pts;
+                renderGrid();
+            })
+            .catch(() => alert('發送失敗，請檢查網路'));
+    }
+</script>
+</body>
+</html>
