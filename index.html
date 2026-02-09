@@ -3,30 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>班級榮譽榜管理系統</title>
+    <title>班級榮譽積分榜</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;900&display=swap" rel="stylesheet">
     <style>
-        :root { --bg-color: #f1f5f9; --card-bg: #ffffff; --primary: #1e293b; --accent: #3b82f6; }
-        body { background-color: var(--bg-color); font-family: "Segoe UI", "Microsoft JhengHei", sans-serif; }
-        .app-header { background: var(--primary); color: white; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        :root { --bg: #f8fafc; --primary: #1e293b; --accent: #2563eb; }
+        body { background-color: var(--bg); font-family: 'Noto Sans TC', sans-serif; }
+        .app-header { background: var(--primary); color: white; padding: 25px 15px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
         .grid-container { 
-            display: grid; grid-template-columns: repeat(auto-fill, minmax(85px, 1fr)); 
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); 
             gap: 12px; padding: 20px; max-width: 900px; margin: 0 auto;
         }
         .num-card {
-            background: var(--card-bg); border-radius: 16px; height: 95px;
+            background: white; border-radius: 16px; height: 105px;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            border: 1px solid #e2e8f0; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            border: 2px solid #e2e8f0; transition: all 0.2s; cursor: pointer;
         }
-        .num-card:hover { transform: translateY(-3px); border-color: var(--accent); box-shadow: 0 6px 12px rgba(0,0,0,0.08); }
-        .num-card:active { transform: scale(0.92); background: #f8fafc; }
-        .num-id { font-size: 1.5rem; font-weight: 800; color: var(--primary); }
-        .num-score { font-size: 0.85rem; font-weight: 700; color: var(--accent); margin-top: 2px; }
-        .modal-content { border-radius: 24px; border: none; overflow: hidden; }
-        .btn-action { height: 65px; font-weight: bold; border-radius: 15px; border: none; transition: 0.2s; }
-        .btn-refresh { position: fixed; bottom: 25px; right: 25px; border-radius: 50px; z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
-        #loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.7); display: none; justify-content: center; align-items: center; z-index: 9999; }
+        .num-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1); }
+        .num-card:active { transform: scale(0.92); }
+        .num-id { font-size: 1.6rem; font-weight: 900; color: var(--primary); line-height: 1; }
+        /* 藍色總分顯示區 */
+        .num-score { font-size: 1rem; font-weight: 700; color: var(--accent); margin-top: 5px; }
+        
+        .modal-content { border-radius: 25px; border: none; }
+        .btn-action { height: 70px; font-weight: 900; border-radius: 15px; font-size: 1.2rem; }
+        #status-bar { font-size: 0.85rem; padding: 5px; background: #f1f5f9; color: #64748b; text-align: center; }
+        #loader { position: fixed; inset: 0; background: rgba(255,255,255,0.8); display: none; justify-content: center; align-items: center; z-index: 9999; }
     </style>
 </head>
 <body>
@@ -34,24 +36,26 @@
 <div id="loader"><div class="spinner-border text-primary"></div></div>
 
 <div class="app-header text-center">
-    <h4 class="fw-bold mb-1">⭐ 班級榮譽積分榜</h4>
-    <p id="status" class="small text-info mb-0">資料同步中...</p>
+    <h3 class="fw-bold mb-1">🏆 班級榮譽積分榜</h3>
+    <p class="mb-0 opacity-75">點擊座號即可快速加扣分</p>
 </div>
+<div id="status-bar">正在載入最新總分...</div>
 
 <div class="grid-container" id="grid"></div>
-
-<button class="btn btn-dark btn-refresh px-4" onclick="loadData()">🔄 刷新分數</button>
 
 <div class="modal fade" id="scoreModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content shadow-lg">
-            <div class="modal-body p-4 text-center">
-                <h4 id="modalTitle" class="fw-bold mb-4">座號</h4>
+            <div class="modal-body p-4">
+                <h4 id="modalTitle" class="text-center fw-bold mb-4">座號</h4>
                 <div class="row g-3">
-                    <div class="col-6"><button class="btn btn-success btn-action w-100" onclick="submitScore(1)">+1 分</button></div>
-                    <div class="col-6"><button class="btn btn-primary btn-action w-100" onclick="submitScore(2)">+2 分</button></div>
-                    <div class="col-6"><button class="btn btn-danger btn-action w-100" onclick="submitScore(-1)">-1 分</button></div>
-                    <div class="col-6"><button class="btn btn-warning btn-action w-100 text-white" onclick="submitScore(-2)">-2 分</button></div>
+                    <div class="col-6"><button class="btn btn-success btn-action w-100" onclick="sendScore(1)">+1</button></div>
+                    <div class="col-6"><button class="btn btn-primary btn-action w-100" onclick="sendScore(2)">+2</button></div>
+                    <div class="col-6"><button class="btn btn-danger btn-action w-100" onclick="sendScore(-1)">-1</button></div>
+                    <div class="col-6"><button class="btn btn-warning btn-action w-100 text-white" onclick="sendScore(-2)">-2</button></div>
+                </div>
+                <div class="mt-4 text-center">
+                    <button class="btn btn-light text-muted btn-sm" data-bs-dismiss="modal">取消</button>
                 </div>
             </div>
         </div>
@@ -60,7 +64,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    // ⚠️ 核心配置：請確保此 CSV 是「工作表1」單獨發布的連結
     const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTeo2bjSCe5pPTsYHKFnyUbYv-c4WQ85qMWk0UUGWbqupW7gTVkDAENCtjOEY0voPjHQkchbGWOuOM2/pub?output=csv";
     const FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScUCNSdNuqfZe-glPZYv0gHYtMKCHITMFILOLVnRw7pSBVnMQ/formResponse";
 
@@ -68,48 +71,42 @@
     let selectedId = 0;
     const modal = new bootstrap.Modal(document.getElementById('scoreModal'));
 
-    // 初始化 1-36 號
+    // 初始化 1-36 號為 0 分
     for (let n = 1; n <= 36; n++) scores[n] = 0;
 
-    // 1. 讀取「工作表1」的加總資料
-    async function loadData() {
-        const statusEl = document.getElementById('status');
-        statusEl.innerText = "正在連線...";
+    // 讀取 CSV 資料 (工作表1 的 A欄座號, B欄總分)
+    async function fetchData() {
         try {
-            // 使用 Date.now() 破除瀏覽器快取 (Cache)
-            const response = await fetch(`${CSV_URL}&t=${Date.now()}`);
-            const text = await response.text();
-            
-            // 處理 CSV 內容
+            const resp = await fetch(`${CSV_URL}&t=${Date.now()}`);
+            const text = await resp.text();
             const rows = text.split(/\r?\n/).filter(r => r.trim() !== "");
             
             rows.forEach(row => {
                 const cols = row.split(',').map(c => c.replace(/"/g, '').trim());
-                const id = parseInt(cols[0]); // A欄：座號
-                const total = parseFloat(cols[1]); // B欄：總分
+                const id = parseInt(cols[0]);   // 座號 (A 欄)
+                const total = parseFloat(cols[1]); // 總分 (B 欄)
                 
                 if (!isNaN(id) && id >= 1 && id <= 36) {
                     scores[id] = isNaN(total) ? 0 : total;
                 }
             });
-            
-            renderGrid();
-            statusEl.innerText = `最後更新：${new Date().toLocaleTimeString()}`;
-            statusEl.className = "small text-success mb-0";
+            render();
+            document.getElementById('status-bar').innerText = `✅ 同步成功 | 更新時間：${new Date().toLocaleTimeString()}`;
         } catch (e) {
-            statusEl.innerText = "讀取失敗，請確認網路或 CSV 發布設定";
-            statusEl.className = "small text-danger mb-0";
+            document.getElementById('status-bar').innerText = "❌ 讀取失敗，請稍後重試";
         }
     }
 
-    // 2. 繪製方塊
-    function renderGrid() {
+    function render() {
         const grid = document.getElementById('grid');
         grid.innerHTML = '';
         for (let i = 1; i <= 36; i++) {
             const card = document.createElement('div');
             card.className = 'num-card';
-            card.innerHTML = `<div class="num-id">${i}</div><div class="num-score">${scores[i]} 分</div>`;
+            card.innerHTML = `
+                <div class="num-id">${i}</div>
+                <div class="num-score">${scores[i]} 分</div>
+            `;
             card.onclick = () => {
                 selectedId = i;
                 document.getElementById('modalTitle').innerText = `${i} 號同學`;
@@ -119,31 +116,29 @@
         }
     }
 
-    // 3. 提交加分到 Google 表單
-    function submitScore(pts) {
+    async function sendScore(pts) {
         modal.hide();
         document.getElementById('loader').style.display = 'flex';
         
-        // 預填網址參數
         const finalUrl = `${FORM_URL}?entry.1999437402=${selectedId}&entry.616875581=${pts}&submit=Submit`;
 
-        // 使用 no-cors 模式背景發送
-        fetch(finalUrl, { mode: 'no-cors' }).then(() => {
-            // 為了良好體驗，本地先手動加分
+        try {
+            await fetch(finalUrl, { mode: 'no-cors' });
+            // 本地立即更新顯示，不用等 CSV 延遲
             scores[selectedId] += pts;
-            renderGrid();
-            
+            render();
             setTimeout(() => {
                 document.getElementById('loader').style.display = 'none';
-                alert(`發送成功！${selectedId} 號已紀錄 ${pts > 0 ? '+' : ''}${pts} 分`);
             }, 500);
-        }).catch(err => {
+        } catch (err) {
+            alert("傳送失敗");
             document.getElementById('loader').style.display = 'none';
-            alert("發送失敗，請稍後再試");
-        });
+        }
     }
 
-    window.onload = loadData;
+    window.onload = fetchData;
+    // 每 5 分鐘自動刷新一次 (配合 Google CSV 更新頻率)
+    setInterval(fetchData, 300000);
 </script>
 </body>
 </html>
